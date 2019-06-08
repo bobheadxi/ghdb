@@ -30,11 +30,16 @@ func newPool(opts DatabaseOpts) *connPool {
 	}
 }
 
-func (p *connPool) Exec(exec func() error) error {
+func (p *connPool) Exec(exec executable) error {
 	resp, err := p.p.ProcessTimed(exec, p.to)
 	if err != nil {
 		return fmt.Errorf("failed to execute job: %v", err)
 	}
+
+	if resp == nil {
+		return nil
+	}
+
 	execErr, ok := resp.(error)
 	if !ok {
 		return fmt.Errorf("unexpected non-error return type: %T", resp)

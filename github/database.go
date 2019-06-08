@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/shurcooL/githubv4"
-
 	"github.com/src-d/go-mysql-server/sql"
 
 	"go.bobheadxi.dev/ghdb/log"
@@ -75,12 +74,12 @@ func (d *database) Tables() map[string]sql.Table {
 
 	var q struct {
 		Viewer struct {
-			Repository struct {
+			Repositories struct {
 				Nodes []struct {
 					NameWithOwner string
 				}
 				PageInfo pageInfo
-			} `graphql:"repository(affiliations: $affs, ownerAffiliations: $oAffs, first: 100, after: $cursor)"`
+			} `graphql:"repositories(affiliations: $affs, ownerAffiliations: $oAffs, first: 100, after: $cursor)"`
 		}
 	}
 	if err := d.pool.Exec(func() error {
@@ -102,35 +101,35 @@ func (d *database) Tables() map[string]sql.Table {
 			if err := d.c.Query(d.ctx, &q, vars); err != nil {
 				return err
 			}
-			for _, n := range q.Viewer.Repository.Nodes {
+			for _, n := range q.Viewer.Repositories.Nodes {
 				tables[n.NameWithOwner] = nil // TODO
 			}
-			if !q.Viewer.Repository.PageInfo.HasNextPage {
+			if !q.Viewer.Repositories.PageInfo.HasNextPage {
 				break
 			}
-			vars["cursor"] = githubv4.NewString(q.Viewer.Repository.PageInfo.EndCursor)
+			vars["cursor"] = githubv4.NewString(q.Viewer.Repositories.PageInfo.EndCursor)
 		}
 
 		return nil
 	}); err != nil {
-		d.l.Error("failed to fetch tables: %v", err)
+		d.l.Error("failed to fetch tables:", err)
 		return nil
 	}
 
+	d.l.Debug("fetched tables:", tables)
 	return tables
 }
 
 func (d *database) Ping() error {
-	// check the client
-	// don't use pool here
+	// check client auth and connectivity. don't use pool here
 	var q struct{ Viewer struct{ Name string } }
 	timeout, cancel := context.WithTimeout(d.ctx, 30*time.Second)
 	defer cancel()
-	if err := d.c.Query(timeout, q, nil); err != nil {
-		d.l.Error("ping unsuccessful", "error", err)
+	if err := d.c.Query(timeout, &q, nil); err != nil {
+		d.l.Error("ping unsuccessful - error:", err)
 		return err
 	}
-	d.l.Info("ping successful", "viewer.name", q.Viewer.Name)
+	d.l.Info("ping successful - viewer.name:", q.Viewer.Name)
 	return nil
 }
 

@@ -2,30 +2,30 @@ package ghdb
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/joho/godotenv"
 	"github.com/src-d/go-mysql-server/sql"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
+	"golang.org/x/oauth2"
 
 	"go.bobheadxi.dev/ghdb/github"
 )
 
 func TestEngine_integration(t *testing.T) {
 	godotenv.Load()
-	auth := github.NewEnvAuth()
-	t.Logf("%+v", auth)
 	engine, err := New(EngineOpts{
 		Logger: zaptest.NewLogger(t).Sugar(),
-		Auth:   auth,
+		Auth: github.NewStaticTokenSource("test", oauth2.Token{
+			AccessToken: os.Getenv("GITHUB_TOKEN"),
+		}),
 	})
 	require.NoError(t, err)
 
-	_, _, err = engine.Query(&sql.Context{
-		Context: context.Background(),
-	}, `
-		SELECT * FROM this_is_dumb
+	_, _, err = engine.Query(sql.NewContext(context.Background()), `
+		SELECT * FROM ubclaunchpad/inertia
 	`)
 	require.NoError(t, err)
 }
