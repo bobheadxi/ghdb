@@ -1,10 +1,8 @@
 package github
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"time"
 
@@ -12,11 +10,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func newClient() *http.Client {
-	src := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv("GITHUB_TOKEN")},
-	)
-	return oauth2.NewClient(context.Background(), src)
+// TokenSource authorizes GitHub access and provides a name for your GitHub
+// user or organization
+type TokenSource interface {
+	Name() string
+
+	oauth2.TokenSource
 }
 
 // AppAuth is a container for authorization configuration
@@ -36,6 +35,10 @@ func NewEnvAuth() *AppAuth {
 		AppID:          os.Getenv("GITHUB_APP_ID"),
 	}
 }
+
+// Name returns the name/scope of this auth source and fulfills the TokenSource
+// interface
+func (a *AppAuth) Name() string { return a.AppID }
 
 // Token implements oauth2.TokenSource, and is used as an autogenerating token
 // source
