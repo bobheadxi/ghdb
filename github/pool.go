@@ -16,7 +16,7 @@ type connPool struct {
 
 // TODO: retry policy?
 // TODO: some way to monitor queue sizes
-func newPool(opts DatabaseOpts) *connPool {
+func newPool(opts EngineOpts) *connPool {
 	pool := tunny.NewFunc(opts.PoolSize, func(payload interface{}) interface{} {
 		fn, ok := payload.(executable)
 		if !ok {

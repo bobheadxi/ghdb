@@ -7,25 +7,25 @@ import (
 	"go.bobheadxi.dev/ghdb/log"
 )
 
-// EngineOpts configures a ghdb engine instance.
-type EngineOpts struct {
-	Auth     github.TokenSource
-	Database github.DatabaseOpts
-	Logger   log.Logger
+// DatabaseOpts configures a ghdb database instance.
+type DatabaseOpts struct {
+	Auth   github.TokenSource
+	Engine github.EngineOpts
+	Logger log.Logger
 }
 
 // Engine provides a MySQL-compatible interface to your GitHub issues
 type Engine struct {
 	e  *sqle.Engine
-	db github.Database
+	db github.Engine
 	//
 }
 
 // New instantiates a new ghdb engine
-func New(opts EngineOpts) (*Engine, error) {
+func New(opts DatabaseOpts) (*Engine, error) {
 	driver := sqle.NewDefault()
 
-	gh, err := github.NewDatabase(opts.Logger, opts.Auth, opts.Database)
+	gh, err := github.NewEngine(opts.Logger, opts.Auth, opts.Engine)
 	if err != nil {
 		return nil, err
 	}
