@@ -40,9 +40,8 @@ func (d *DatabaseOpts) setDefaults() {
 }
 
 type database struct {
-	l    log.Logger
-	c    *client
-	pool *connPool
+	l log.Logger
+	c *client
 
 	opts     DatabaseOpts
 	ctx      context.Context
@@ -56,9 +55,8 @@ func NewDatabase(l log.Logger, auth TokenSource, opts DatabaseOpts) (Database, e
 	ctx := context.Background()
 	cancellable, cancel := context.WithCancel(ctx)
 	d := &database{
-		c:    newClient(auth),
-		l:    l,
-		pool: newPool(opts),
+		c: newClient(auth, newPool(opts)),
+		l: l,
 
 		opts:     opts,
 		ctx:      cancellable,
@@ -69,51 +67,32 @@ func NewDatabase(l log.Logger, auth TokenSource, opts DatabaseOpts) (Database, e
 
 func (d *database) Name() string { return d.c.auth.Name() }
 
+// TODO: this probably needs to cache
 func (d *database) Tables() map[string]sql.Table {
 	tables := make(map[string]sql.Table)
-
-	var q struct {
-		Viewer struct {
-			Repositories struct {
-				Nodes []struct {
-					NameWithOwner string
-				}
-				PageInfo pageInfo
-			} `graphql:"repositories(affiliations: $affs, ownerAffiliations: $oAffs, first: 100, after: $cursor)"`
-		}
+	affs := []githubv4.RepositoryAffiliation{
+		githubv4.RepositoryAffiliationOwner,
+		githubv4.RepositoryAffiliationCollaborator,
+		githubv4.RepositoryAffiliationOrganizationMember,
 	}
-	if err := d.pool.Exec(func() error {
-		affs := []githubv4.RepositoryAffiliation{
-			githubv4.RepositoryAffiliationOwner,
-			githubv4.RepositoryAffiliationCollaborator,
-			githubv4.RepositoryAffiliationOrganizationMember,
-		}
-		vars := map[string]interface{}{
-			"affs":   affs,
-			"oAffs":  affs,
-			"cursor": (*githubv4.String)(nil),
-		}
+	vars := map[string]interface{}{
+		"affs":   affs,
+		"oAffs":  affs,
+		"cursor": (*githubv4.String)(nil),
+	}
+	for {
+		var q repositoriesQuery
 		if err := d.c.Query(d.ctx, &q, vars); err != nil {
-			return err
+			d.l.Error("failed to fetch tables:", err)
+			return nil
 		}
-
-		for {
-			if err := d.c.Query(d.ctx, &q, vars); err != nil {
-				return err
-			}
-			for _, n := range q.Viewer.Repositories.Nodes {
-				tables[n.NameWithOwner] = nil // TODO
-			}
-			if !q.Viewer.Repositories.PageInfo.HasNextPage {
-				break
-			}
-			vars["cursor"] = githubv4.NewString(q.Viewer.Repositories.PageInfo.EndCursor)
+		for _, n := range q.Viewer.Repositories.Nodes {
+			tables[n.NameWithOwner] = newTable(d.c, n.NameWithOwner, n.Labels.Nodes)
 		}
-
-		return nil
-	}); err != nil {
-		d.l.Error("failed to fetch tables:", err)
-		return nil
+		if !q.Viewer.Repositories.PageInfo.HasNextPage {
+			break
+		}
+		vars["cursor"] = githubv4.NewString(q.Viewer.Repositories.PageInfo.EndCursor)
 	}
 
 	d.l.Debug("fetched tables:", tables)
@@ -125,7 +104,7 @@ func (d *database) Ping() error {
 	var q struct{ Viewer struct{ Name string } }
 	timeout, cancel := context.WithTimeout(d.ctx, 30*time.Second)
 	defer cancel()
-	if err := d.c.Query(timeout, &q, nil); err != nil {
+	if err := d.c.DirectQuery(timeout, &q, nil); err != nil {
 		d.l.Error("ping unsuccessful - error:", err)
 		return err
 	}
@@ -137,5 +116,5 @@ func (d *database) Close() error {
 	d.l.Debug("closing database")
 	// TODO: maybe try to collect errors if there are any?
 	d.cancelFn()
-	return d.pool.Close()
+	return d.c.Close()
 }

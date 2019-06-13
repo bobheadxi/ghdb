@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jeffail/tunny"
+	"github.com/Jeffail/tunny"
 )
 
 type executable func() error

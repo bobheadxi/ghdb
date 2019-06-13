@@ -3,8 +3,8 @@ module go.bobheadxi.dev/ghdb
 go 1.12
 
 require (
-	github.com/Jeffail/tunny v0.0.0-20181108205650-4921fff29480 // indirect
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/Jeffail/tunny v0.0.0-20181108205650-4921fff29480
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/joho/godotenv v1.3.0
